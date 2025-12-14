@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Singing/Talking Classifier</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: white;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.1rem;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .status-connected {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+            color: #065f46;
+            box-shadow: 0 4px 15px rgba(132, 250, 176, 0.4);
+        }
+
+        .status-disconnected {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            color: #991b1b;
+        }
+
+        .card {
+            background: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            animation: scaleIn 0.5s ease backwards;
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 1rem;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .video-preview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .audio-only-preview {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .audio-only-preview > div:first-child {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        .recording-indicator {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(239, 68, 68, 0.95);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+        }
+
+        .rec-dot {
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 3rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-record {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #434343 0%, #000000 100%);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .processing {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            padding: 1.5rem;
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            border: 2px solid #fca5a5;
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1rem;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .result {
+            background: linear-gradient(135deg, #e0f2fe 0%, #f3e8ff 100%);
+            border: 2px solid #93c5fd;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            animation: resultAppear 0.6s ease;
+        }
+
+        @keyframes resultAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .result-icon {
+            font-size: 3rem;
+            animation: iconBounce 0.8s ease;
+        }
+
+        @keyframes iconBounce {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .result-text h3 {
+            font-size: 2rem;
+            color: #1f2937;
+            text-transform: capitalize;
+        }
+
+        .result-text p {
+            color: #6b7280;
+            font-size: 1rem;
+        }
+
+        .model-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            background: #fef3c7;
+            color: #92400e;
+            margin-top: 0.25rem;
+            display: inline-block;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 12px;
+            background: rgba(229, 231, 235, 0.5);
+            border-radius: 1rem;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 1s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .feature-card label {
+            display: block;
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-card .value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .instructions {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            padding: 1.5rem;
+            animation: scaleIn 0.5s ease 0.2s backwards;
+        }
+
+        .instructions h3 {
+            font-size: 1.25rem;
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+
+        .instructions ol {
+            list-style-position: inside;
+            color: #6b7280;
+            line-height: 1.8;
+        }
+
+        .instructions ol li {
+            margin-bottom: 0.5rem;
+        }
+
+        .note {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1px solid #fbbf24;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            color: #92400e;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 640px) {
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 Singing vs Talking Classifier</h1>
+            <p>Live audio/video recording with real-time classification</p>
+            <div id="backendStatus" class="status-badge status-disconnected">
+                Checking backend...
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="video-container">
+                <video id="videoPreview" class="video-preview hidden" autoplay muted></video>
+                <div id="audioPreview" class="audio-only-preview">
+                    <div style="font-size: 4rem; margin-bottom: 1rem;">🎤</div>
+                    <p style="color: white; font-size: 1.25rem; font-weight: 600;">Audio-Only Mode</p>
+                    <p id="recordingTime" style="color: white; font-size: 2rem; font-weight: 700; margin-top: 1rem;" class="hidden">0:00</p>
+                </div>
+                <div id="recordingIndicator" class="recording-indicator hidden">
+                    <div class="rec-dot"></div>
+                    <span id="recTime">0:00</span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-record" id="recordBtn" onclick="startRecording()">
+                    🎙️ Start Recording
+                </button>
+                <button class="btn btn-stop hidden" id="stopBtn" onclick="stopRecording()">
+                    ⏹️ Stop Recording
+                </button>
+            </div>
+
+            <div id="processing" class="processing hidden">
+                <div class="spinner"></div>
+                <span>Analyzing audio...</span>
+            </div>
+
+            <div id="error" class="error hidden"></div>
+
+            <div id="result" class="result hidden">
+                <div class="result-header">
+                    <div class="result-icon" id="resultIcon">🎵</div>
+                    <div class="result-text">
+                        <h3 id="resultPrediction">Singing</h3>
+                        <p>Confidence: <span id="resultConfidence">85%</span></p>
+                        <div id="modelBadge" class="model-badge hidden">Using mock prediction</div>
+                    </div>
+                </div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" id="confidenceFill" style="width: 0%"></div>
+                </div>
+                <div class="features">
+                    <div class="feature-card">
+                        <label>Pitch Variance</label>
+                        <div class="value" id="featurePitch">0.00</div>
+                    </div>
+                    <div class="feature-card">
+                        <label>Spectral Centroid</label>
+                        <div class="value" id="featureSpectral">0.00</div>
+                    </div>
+                    <div class="feature-card">
+                        <label>Zero Crossing</label>
+                        <div class="value" id="featureZero">0.000</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 How to Use</h3>
+            <ol>
+                <li><strong>Make sure backend is running</strong> - See status badge above</li>
+                <li><strong>Click "Start Recording"</strong> and allow microphone permissions</li>
+                <li><strong>Talk or sing</strong> for a few seconds (at least 2-3 seconds)</li>
+                <li><strong>Click "Stop Recording"</strong> to classify</li>
+                <li><strong>View your results</strong> with confidence score</li>
+            </ol>
+            <div class="note">
+                <strong>Note:</strong> Make sure Python backend is running on <code>http://localhost:5000</code>. 
+                Run <code>python backend.py</code> in terminal to start the server.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'http://localhost:5000';
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let stream = null;
+        let recordingInterval = null;
+        let recordingSeconds = 0;
+        let backendConnected = false;
+
+        // Check backend connection
+        async function checkBackend() {
+            try {
+                const response = await fetch(`${BACKEND_URL}/health`);
+                const data = await response.json();
+                backendConnected = true;
+                
+                const statusEl = document.getElementById('backendStatus');
+                statusEl.textContent = data.model_loaded ? 
+                    '✓ Backend Connected (Trained Model)' : 
+                statusEl.className = 'status-badge status-connected';
+                
+                console.log('✓ Backend connected:', data);
+            } catch (err) {
+                backendConnected = false;
+                const statusEl = document.getElementById('backendStatus');
+                statusEl.textContent = '✗ Backend Disconnected';
+                statusEl.className = 'status-badge status-disconnected';
+                console.error('✗ Backend connection failed:', err);
+            }
+        }
+
+        async function startRecording() {
+            if (!backendConnected) {
+                showError('Backend not connected! Please start the Python server: python backend.py');
+                return;
+            }
+
+            try {
+                hideElements(['error', 'result']);
+                recordingSeconds = 0;
+                
+                console.log('Requesting microphone access...');
+                
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: true 
+                });
+                
+                console.log('Granted microphone access');
+                
+                const audioPreview = document.getElementById('audioPreview');
+                audioPreview.classList.remove('hidden');
+                document.getElementById('recordingTime').classList.remove('hidden');
+
+                audioChunks = [];
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                        console.log(`Audio chunk received: ${event.data.size} bytes`);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    console.log('Recording stopped, processing...');
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    console.log(`Total audio size: ${audioBlob.size} bytes`);
+                    await classifyAudio(audioBlob);
+                    stopAllStreams();
+                };
+
+                mediaRecorder.start();
+                console.log('Recording started');
+                
+                document.getElementById('recordBtn').classList.add('hidden');
+                document.getElementById('stopBtn').classList.remove('hidden');
+                document.getElementById('recordingIndicator').classList.remove('hidden');
+                
+                recordingInterval = setInterval(() => {
+                    recordingSeconds++;
+                    const mins = Math.floor(recordingSeconds / 60);
+                    const secs = recordingSeconds % 60;
+                    const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                    document.getElementById('recTime').textContent = timeStr;
+                    document.getElementById('recordingTime').textContent = timeStr;
+                }, 1000);
+
+            } catch (err) {
+                console.error('Error starting recording:', err);
+                showError(`Cannot access microphone: ${err.message}. Please allow microphone permissions in your browser.`);
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                
+                if (recordingInterval) {
+                    clearInterval(recordingInterval);
+                    recordingInterval = null;
+                }
+                
+                document.getElementById('recordBtn').classList.remove('hidden');
+                document.getElementById('stopBtn').classList.add('hidden');
+                document.getElementById('recordingIndicator').classList.add('hidden');
+                document.getElementById('recordingTime').classList.add('hidden');
+            }
+        }
+
+        function stopAllStreams() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                console.log('All streams stopped');
+            }
+        }
+
+        async function classifyAudio(audioBlob) {
+            showElement('processing');
+            hideElements(['error', 'result']);
+
+            try {
+                console.log('Sending audio to backend...');
+                
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+
+                const response = await fetch(`${BACKEND_URL}/classify`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log(`Response status: ${response.status}`);
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    throw new Error(errorData.error || `Server error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('Classification result received:', result);
+                
+                displayResult(result);
+
+            } catch (err) {
+                console.error('Classification error:', err);
+                showError(`Classification failed: ${err.message}`);
+            } finally {
+                hideElement('processing');
+            }
+        }
+
+        function displayResult(result) {
+            console.log('Showing result:', result);
+            
+            document.getElementById('resultPrediction').textContent = result.prediction;
+            document.getElementById('resultConfidence').textContent = 
+                (result.confidence * 100).toFixed(1) + '%';
+            document.getElementById('resultIcon').textContent = 
+                result.prediction === 'singing' ? '🎵' : '💬';
+            
+            const modelBadge = document.getElementById('modelBadge');
+            if (!result.using_trained_model) {
+                modelBadge.textContent = 'hidden';
+                modelBadge.classList.remove('hidden');
+            } else {
+                modelBadge.classList.add('hidden');
+            }
+            
+            setTimeout(() => {
+                document.getElementById('confidenceFill').style.width = 
+                    (result.confidence * 100) + '%';
+            }, 100);
+            
+            document.getElementById('featurePitch').textContent = 
+                result.features.pitch_variance.toFixed(2);
+            document.getElementById('featureSpectral').textContent = 
+                result.features.spectral_centroid.toFixed(2);
+            document.getElementById('featureZero').textContent = 
+                result.features.zero_crossing_rate.toFixed(3);
+            
+            showElement('result');
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+            console.error('Error shown to user:', message);
+        }
+
+        function showElement(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function hideElement(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function hideElements(ids) {
+            ids.forEach(id => hideElement(id));
+        }
+
+        console.log('Initializing application...');
+        checkBackend();
+        setInterval(checkBackend, 10000);
+    </script>
+</body>
+</html>
